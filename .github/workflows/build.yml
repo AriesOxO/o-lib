@@ -6,10 +6,19 @@ on:
       - 'v*'
   pull_request:
     branches: [main, master]
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: Olib-windows
+          - os: macos-latest
+            artifact: Olib-macos
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,14 +34,14 @@ jobs:
       - name: Verify imports
         run: python -c "from app.views.main_window import Window; print('OK')"
 
-      - name: Build executable
-        run: pyinstaller --onefile --windowed --icon=logo.ico --name=Olib app.py
+      - name: Build
+        run: python build.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Olib-windows
-          path: dist/Olib.exe
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}.zip
 
   release:
     needs: build
@@ -43,10 +52,11 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: Olib-windows
+          path: artifacts
+          merge-multiple: true
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: Olib.exe
+          files: artifacts/*.zip
           generate_release_notes: true

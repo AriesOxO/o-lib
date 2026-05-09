@@ -11,20 +11,35 @@ import sys
 import os
 
 def setup_logger():
-    env = get_env()  # 默认为生产环境
-    # 清空默认的日志处理器
+    env = get_env()  # 小写
     logger.remove()
-    # 根据环境设置不同的日志配置
-    if env == 'DEV':
-        # 开发环境：输出到控制台和文件
-        logger.add(sys.stdout, level="DEBUG", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
-        logger.add("app_debug.log", level="DEBUG", rotation="1 MB", retention="10 days", compression="zip")
-    elif env == 'PROD':
-        # 生产环境：只输出到控制台
-        logger.add(sys.stdout, level="INFO", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
+
+    # windowed 模式下 sys.stdout/stderr 可能为 None（GUI 无控制台）
+    has_console = sys.stdout is not None
+
+    fmt = "{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}"
+
+    if env == 'dev':
+        if has_console:
+            logger.add(sys.stdout, level="DEBUG", format=fmt)
+        logger.add("app_debug.log", level="DEBUG",
+                   rotation="1 MB", retention="10 days", compression="zip",
+                   format=fmt)
+    elif env == 'prod':
+        if has_console:
+            logger.add(sys.stdout, level="INFO", format=fmt)
+        else:
+            # 打包后的 GUI 应用也保留文件日志便于排查
+            logger.add("app.log", level="INFO",
+                       rotation="5 MB", retention="7 days",
+                       format=fmt)
     else:
-        # 默认处理方式
-        logger.add(sys.stdout, level="DEBUG", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
+        if has_console:
+            logger.add(sys.stdout, level="DEBUG", format=fmt)
+        logger.add("app_debug.log", level="DEBUG",
+                   rotation="1 MB", retention="10 days",
+                   format=fmt)
+
     logger.info(f"current env: {env}")
     # 可以根据需要配置更多的处理器，比如发送邮件、记录到数据库等
 if __name__ == '__main__':
