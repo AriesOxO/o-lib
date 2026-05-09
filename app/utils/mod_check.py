@@ -16,13 +16,18 @@ class CheckUpdate():
     def __get_config(self):
         domain = get_domain()
         api_config = f'{domain}/OlibServer'
-        resp = requests.get(api_config)
-        print(api_config)
-        self.__config = resp.json()
+        try:
+            resp = requests.get(api_config, timeout=5)
+            self.__config = resp.json()
+        except Exception as e:
+            logger.warning(f"获取服务端配置失败: {e}")
+            self.__config = None
 
     def __get_version_status(self):
         if self.__config is None:
             self.__get_config()
+        if self.__config is None:
+            return 0
         client_ver = VERSION
         server_vers = self.__config.get('Versions')
         latest = server_vers[-1]
@@ -43,12 +48,16 @@ class CheckUpdate():
     def get_notice(self):
         if self.__config is None:
             self.__get_config()
+        if self.__config is None:
+            return {'show': False, 'title': '', 'content': ''}
         server_notice = self.__config.get('Notice')
-        return server_notice
+        return server_notice if server_notice else {'show': False, 'title': '', 'content': ''}
 
     def get_update_url(self):
         if self.__config is None:
             self.__get_config()
+        if self.__config is None:
+            return None
         update_url = self.__config.get('UpdateUrl')
         return update_url
 

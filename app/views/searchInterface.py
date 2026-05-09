@@ -41,7 +41,7 @@ class SearchInterface(QFrame):
         self.searchLineEdit.setFixedWidth(self.width() // 2)# 宽度设为容器的一半
 
         #初始化工具栏
-        hbox = QHBoxLayout(self)
+        hbox = QHBoxLayout()
         #语言选项
         self.langComboBox = ComboBox()
         for k,v in Languages.items():
@@ -106,7 +106,7 @@ class SearchInterface(QFrame):
         cfg.set(cfg.accurate,self.accurate_CheckBox.isChecked())
 
     def add_command_bar(self):
-        hbox = QHBoxLayout(self)
+        hbox = QHBoxLayout()
         hbox.setStretch(0, 1)
         hbox.setStretch(1, 4)
         hbox.setStretch(2, 1)
