@@ -15,6 +15,9 @@ from loguru import logger
 
 if __name__ == '__main__':
     setup_logger()
+    # 确保必要目录存在
+    os.makedirs('config', exist_ok=True)
+    os.makedirs('download', exist_ok=True)
     if cfg.get(cfg.dpiScale) == "Auto":
         QApplication.setHighDpiScaleFactorRoundingPolicy(
             Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)

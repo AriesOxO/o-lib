@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Syntax check
+        run: |
+          python -c "
+          import py_compile, os, sys
+          errors = []
+          for root, dirs, files in os.walk('app'):
+              dirs[:] = [d for d in dirs if d != '__pycache__']
+              for f in files:
+                  if f.endswith('.py'):
+                      path = os.path.join(root, f)
+                      try:
+                          py_compile.compile(path, doraise=True)
+                      except py_compile.PyCompileError as e:
+                          errors.append(str(e))
+          try:
+              py_compile.compile('app.py', doraise=True)
+          except py_compile.PyCompileError as e:
+              errors.append(str(e))
+          if errors:
+              for e in errors:
+                  print(e)
+              sys.exit(1)
+          print('All files OK')
+          "
+
+      - name: Import check
+        run: python -c "from app.views.main_window import Window; print('All imports OK')"
