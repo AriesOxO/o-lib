@@ -50,10 +50,15 @@ class Window(FramelessWindow):
         self.initWindow()
         StyleSheet.MAIN_WINDOW.apply(self)
     def checkUpdate(self):
-        cu = CheckUpdate()
+        """异步检查更新，避免阻塞 UI 启动"""
+        self._updater = CheckUpdate(async_mode=True)
+        self._updater.check_async(self._on_update_checked)
+
+    def _on_update_checked(self, checker):
+        """后台检查完成后的回调"""
         if cfg.checkUpdateAtStartUp.value:
-            cu.handle_version() #检查版本更新
-        self.show_notice(cu.get_notice())
+            checker.handle_version()
+        self.show_notice(checker.get_notice())
 
     def show_notice(self,notice):
         show = notice.get('show')

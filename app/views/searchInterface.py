@@ -248,7 +248,10 @@ class SearchInterface(QFrame):
     def preview(self,row):
         book = self.get_current_book(row)
         if book:
-            url = book.get('readOnlineUrl')+f'&user_id=38713159&user_key=5dcc5da2ccd3f344c0c66a17c33349cf'
+            url = book.get('readOnlineUrl')
+            if not url:
+                self.createWarningInfoBar("预览不可用", "该书籍未提供预览链接。")
+                return
             webbrowser.open(url)
 
     def show_books(self,books):
