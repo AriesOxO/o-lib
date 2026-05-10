@@ -24,6 +24,7 @@ env/
 
 # Runtime
 config/config.json
+config/search_history.json
 download/
 *.log
 app_debug.log
