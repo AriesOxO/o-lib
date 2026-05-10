@@ -7,3 +7,5 @@ from .mod_domain import get_domain
 from .mod_log import setup_logger
 from .mod_check import CheckUpdate
 from .mod_uuid import get_uuid
+from .mod_fs import open_in_file_manager, default_download_dir
+from .mod_history import SearchHistory

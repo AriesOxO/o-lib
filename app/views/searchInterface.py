@@ -9,15 +9,16 @@ from PyQt5.QtCore import Qt,pyqtSignal
 from PyQt5.QtWidgets import (QVBoxLayout, QFrame, \
     QTableWidgetItem, QHeaderView, \
     QHBoxLayout, QWidget, QCheckBox,QLabel,QLineEdit,QListWidget,QListWidgetItem,
-   QComboBox)
+   QComboBox, QCompleter)
 from qfluentwidgets import (SearchLineEdit,StateToolTip,TeachingTip,RoundMenu,Action,
                             TeachingTipTailPosition,TableWidget,SmoothMode,MenuAnimationType,
                             ComboBox,InfoBar,InfoBarPosition,CheckBox,PopUpAniStackedWidget,EditableComboBox,
-                            BodyLabel,CommandBar)
+                            BodyLabel,CommandBar,SpinBox)
 from qfluentwidgets import FluentIcon as FIF
 from ..tools.olib_search import OlibSearcherV4
 from ..common.style_sheet import StyleSheet
 from ..common.config import cfg,Languages,SearchMode,Extensions
+from ..utils import open_in_file_manager, SearchHistory
 from loguru import logger
 
 class SearchInterface(QFrame):
@@ -27,6 +28,7 @@ class SearchInterface(QFrame):
         self.setObjectName(obj_name)
         self.books = None
         self.add_cb = False #添加命令行标志
+        self.history = SearchHistory()
         # 初始化布局
         self.layout = QVBoxLayout(self)
         self.initUI()
@@ -39,6 +41,12 @@ class SearchInterface(QFrame):
         self.searchLineEdit = SearchLineEdit()
         self.searchLineEdit.setPlaceholderText("请输入书名进行搜索")
         self.searchLineEdit.setFixedWidth(self.width() // 2)# 宽度设为容器的一半
+
+        # 搜索历史自动补全
+        self.completer = QCompleter(self.history.all(), self.searchLineEdit)
+        self.completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.completer.setFilterMode(Qt.MatchContains)
+        self.searchLineEdit.setCompleter(self.completer)
 
         #初始化工具栏
         hbox = QHBoxLayout()
@@ -60,6 +68,23 @@ class SearchInterface(QFrame):
         hbox.addWidget(self.langComboBox)
         hbox.addWidget(self.extComboBox)
 
+        # 年份筛选行
+        year_hbox = QHBoxLayout()
+        year_hbox.addWidget(BodyLabel("出版年份:"))
+        self.yearFromEdit = SpinBox()
+        self.yearFromEdit.setRange(0, 9999)
+        self.yearFromEdit.setValue(0)
+        self.yearFromEdit.setPrefix("从 ")
+        self.yearFromEdit.setSpecialValueText("从 不限")
+        self.yearToEdit = SpinBox()
+        self.yearToEdit.setRange(0, 9999)
+        self.yearToEdit.setValue(0)
+        self.yearToEdit.setPrefix("到 ")
+        self.yearToEdit.setSpecialValueText("到 不限")
+        year_hbox.addWidget(self.yearFromEdit)
+        year_hbox.addWidget(self.yearToEdit)
+        year_hbox.addStretch(1)
+
 
         #初始化展示页
         self.tableWidget = TableWidget()
@@ -80,6 +105,7 @@ class SearchInterface(QFrame):
         self.init_combo_box()
         self.layout.addWidget(self.searchLineEdit,alignment=Qt.AlignTop|Qt.AlignHCenter)
         self.layout.addLayout(hbox)
+        self.layout.addLayout(year_hbox)
         self.layout.addWidget(self.tableWidget)
 
 
@@ -98,6 +124,14 @@ class SearchInterface(QFrame):
         self.extComboBox.setCurrentIndex(cfg.extensions.value)
         self.langComboBox.setCurrentIndex(cfg.language.value)
         self.accurate_CheckBox.setChecked(cfg.accurate.value)
+
+    def _year_from(self):
+        v = self.yearFromEdit.value()
+        return str(v) if v > 0 else None
+
+    def _year_to(self):
+        v = self.yearToEdit.value()
+        return str(v) if v > 0 else None
 
     def save_search_parameter(self):
         cfg.set(cfg.language,self.langComboBox.currentIndex())
@@ -169,6 +203,9 @@ class SearchInterface(QFrame):
             self.add_command_bar()
         if self.searchLineEdit.text()!='':
             title = self.searchLineEdit.text()
+            # 记录到搜索历史
+            self.history.add(title)
+            self.completer.model().setStringList(self.history.all())
             self.stp = StateToolTip("搜索中",f"正在搜索{title}~请耐心等待",self.parent())
             self.save_search_parameter()
             lang = Languages[self.langComboBox.currentText()]
@@ -179,7 +216,7 @@ class SearchInterface(QFrame):
             n = cfg.searchNums.value
 
 
-            self.searchEngine = OlibSearcherV4(title,languages=lang,extensions=ext,page=page,order=mode,limit=str(n),e=accurate_state)
+            self.searchEngine = OlibSearcherV4(title,languages=lang,extensions=ext,page=page,order=mode,limit=str(n),e=accurate_state,yearFrom=self._year_from(),yearTo=self._year_to())
             self.searchEngine.sig_success.connect(self.show_books)
             self.searchEngine.sig_fail.connect(self.failed)
             self.searchEngine.finished.connect(lambda:self.searchEngine.deleteLater())
@@ -215,7 +252,7 @@ class SearchInterface(QFrame):
 
     def __open_folder(self):
         folder = cfg.downloadFolder.value
-        os.startfile(folder)
+        open_in_file_manager(folder)
 
     def __open_cloud_boolshelf(self):
         webbrowser.open('https://web.koodoreader.com/')
