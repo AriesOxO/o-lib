@@ -18,6 +18,8 @@ jobs:
             artifact: Olib-windows
           - os: macos-latest
             artifact: Olib-macos
+          - os: ubuntu-latest
+            artifact: Olib-linux
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -28,10 +30,19 @@ jobs:
           python-version: '3.10'
           cache: 'pip'
 
+      - name: Install system deps (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb-xinerama0 libxcb-cursor0 \
+            libxkbcommon-x11-0 libdbus-1-3 libegl1
+
       - name: Install dependencies
         run: pip install -r requirements.txt pyinstaller
 
-      - name: Verify imports
+      - name: Verify imports (headless)
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: python -c "from app.views.main_window import Window; print('OK')"
 
       - name: Build

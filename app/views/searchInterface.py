@@ -18,7 +18,8 @@ from qfluentwidgets import FluentIcon as FIF
 from ..tools.olib_search import OlibSearcherV4
 from ..common.style_sheet import StyleSheet
 from ..common.config import cfg,Languages,SearchMode,Extensions
-from ..utils import open_in_file_manager, SearchHistory
+from ..common.errors import SearchError
+from ..utils import open_in_file_manager, SearchHistory, Favorites
 from loguru import logger
 
 class SearchInterface(QFrame):
@@ -29,6 +30,7 @@ class SearchInterface(QFrame):
         self.books = None
         self.add_cb = False #添加命令行标志
         self.history = SearchHistory()
+        self.favorites = Favorites()
         # 初始化布局
         self.layout = QVBoxLayout(self)
         self.initUI()
@@ -244,6 +246,15 @@ class SearchInterface(QFrame):
         if cfg.downloadSwitch.value==True:
             self.menu.addAction(Action(FIF.DOWNLOAD,"下载",triggered=lambda:self.download(row)))
         self.menu.addAction(Action(FIF.QUICK_NOTE,"预览",triggered=lambda:self.preview(row)))
+
+        # 收藏/取消收藏
+        book = self.get_current_book(row)
+        if book:
+            if self.favorites.contains(book.get('id')):
+                self.menu.addAction(Action(FIF.HEART, "取消收藏", triggered=lambda: self.toggle_favorite(row)))
+            else:
+                self.menu.addAction(Action(FIF.HEART, "收藏", triggered=lambda: self.toggle_favorite(row)))
+
         self.menu.addAction(Action(FIF.BOOK_SHELF,"打开书架",triggered=self.__open_folder))
         self.menu.addAction(Action(FIF.CLOUD,"云书架",triggered=self.__open_cloud_boolshelf))
         self.menu.addAction(Action(FIF.QUICK_NOTE,"微信读书",triggered=self.__open_weread))
@@ -291,6 +302,32 @@ class SearchInterface(QFrame):
                 return
             webbrowser.open(url)
 
+    def toggle_favorite(self, row):
+        book = self.get_current_book(row)
+        if not book:
+            return
+        if self.favorites.contains(book.get('id')):
+            self.favorites.remove(book.get('id'))
+            self.createWarningInfoBar("已取消收藏", book.get('title', ''), type_='success')
+        else:
+            self.favorites.add(book)
+            self.createWarningInfoBar("已收藏", book.get('title', ''), type_='success')
+        # 刷新标题列前缀显示
+        self._refresh_favorite_marks()
+
+    def _refresh_favorite_marks(self):
+        if not self.books:
+            return
+        for i, book in enumerate(self.books):
+            item = self.tableWidget.item(i, 0)
+            if item is None:
+                continue
+            title = book.get('title', '')
+            if self.favorites.contains(book.get('id')):
+                item.setText(f"★ {title}")
+            else:
+                item.setText(title)
+
     def show_books(self,books):
         self.books = books
         self.set_status_bar()
@@ -302,7 +339,8 @@ class SearchInterface(QFrame):
             author = book['author']
             file_size = book['filesizeString']
             file_type = book['extension']
-            item_title = QTableWidgetItem(title)
+            display_title = f"★ {title}" if self.favorites.contains(book.get('id')) else title
+            item_title = QTableWidgetItem(display_title)
             item_title.setToolTip(title)
             self.tableWidget.setItem(i,0, item_title)
             self.tableWidget.setItem(i,1, QTableWidgetItem(year))
@@ -316,20 +354,14 @@ class SearchInterface(QFrame):
     def failed(self,e):
         self.stp.close()
         self.tableWidget.clearContents()
-        if e==0:
-            logger.error("数据为空")
-            self.createWarningInfoBar("结果为空","本次搜索结果为空，请更改搜索条件。")
-        elif e==-1:
-            logger.error("数据获取异常")
-            self.createWarningInfoBar("未知异常",
-                                      "请联系shiyi0x7f定位修复")
-        elif e==-999:
-            logger.error("违禁词")
-            self.createWarningInfoBar("搜索词异常",
-                                      "请修改搜索词！")
-        elif e==999:
-            self.createWarningInfoBar("速率限制",
-                                      "服务器压力巨大，当前搜索限制为15次/分钟，请稍后再试。")
+        try:
+            err = SearchError(e)
+            title, content = err.user_message
+            logger.error(f"搜索失败 [{err.name}]")
+            self.createWarningInfoBar(title, content)
+        except ValueError:
+            logger.error(f"未知错误码: {e}")
+            self.createWarningInfoBar("未知异常", "请稍后重试或联系支持。")
 
     def createWarningInfoBar(self,title,content,type_=None):
         if type_ is None:
